@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Presales & Marketing Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body{background:#111;color:#fff;font-family:Arial;padding:20px;}
+    h2{margin-top:30px;}
+    .upload-box{padding:20px;border:2px dashed #444;border-radius:10px;text-align:center;margin-bottom:20px;}
+    .cards{display:flex;gap:20px;flex-wrap:wrap;margin-top:20px;}
+    .card{
+        background:#1c1c1c;padding:20px;border-radius:12px;width:220px;
+        text-align:center;box-shadow:0 0 10px rgba(0,0,0,0.3);
+    }
+    table{width:100%;border-collapse:collapse;margin-top:20px;}
+    table th,table td{border:1px solid #333;padding:8px;}
+    table th{background:#222;}
+</style>
+</head>
+
+<body>
+<h1>Presales & Marketing Dashboard</h1>
+
+<div class="upload-box">
+    <h3>Upload Excel File</h3>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+</div>
+
+<div class="cards">
+    <div class="card"><h3>Total Leads</h3><p id="totalLeads">0</p></div>
+    <div class="card"><h3>Caller 1 Leads</h3><p id="caller1">0</p></div>
+    <div class="card"><h3>Caller 2 Leads</h3><p id="caller2">0</p></div>
+    <div class="card"><h3>Converted</h3><p id="converted">0</p></div>
+    <div class="card"><h3>Follow-up Pending</h3><p id="follow">0</p></div>
+</div>
+
+<h2>Leads by Source</h2>
+<canvas id="sourceChart"></canvas>
+
+<h2>Leads by Status</h2>
+<canvas id="statusChart"></canvas>
+
+<h2>Full Lead Data</h2>
+<table id="leadTable">
+    <thead></thead>
+    <tbody></tbody>
+</table>
+
+<script>
+document.getElementById("fileInput").addEventListener("change", function(e){
+    const file = e.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e){
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type:"array"});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet);
+
+        renderDashboard(json);
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+function renderDashboard(data){
+    document.getElementById("totalLeads").innerText = data.length;
+
+    let caller1 = data.filter(x => x["Assigned To"]==="Caller 1").length;
+    let caller2 = data.filter(x => x["Assigned To"]==="Caller 2").length;
+    let converted = data.filter(x => x["Status"]==="Converted").length;
+    let followup = data.filter(x => x["Status"]==="Follow-up").length;
+
+    document.getElementById("caller1").innerText = caller1;
+    document.getElementById("caller2").innerText = caller2;
+    document.getElementById("converted").innerText = converted;
+    document.getElementById("follow").innerText = followup;
+
+    let sourceCount = {};
+    let statusCount = {};
+
+    data.forEach(x=>{
+        sourceCount[x["Lead Source"]] = (sourceCount[x["Lead Source"]]||0)+1;
+        statusCount[x["Status"]] = (statusCount[x["Status"]]||0)+1;
+    });
+
+    makeChart("sourceChart", sourceCount);
+    makeChart("statusChart", statusCount);
+
+    renderTable(data);
+}
+
+function makeChart(id, obj){
+    const ctx = document.getElementById(id).getContext("2d");
+    new Chart(ctx, {
+        type:"bar",
+        data:{
+            labels:Object.keys(obj),
+            datasets:[{
+                data:Object.values(obj),
+                backgroundColor:"rgba(0, 150, 255, 0.7)"
+            }]
+        },
+        options:{responsive:true,plugins:{legend:{display:false}}}
+    });
+}
+
+function renderTable(data){
+    const tableHead = document.querySelector("#leadTable thead");
+    const tableBody = document.querySelector("#leadTable tbody");
+    tableHead.innerHTML = "";
+    tableBody.innerHTML = "";
+
+    let headers = Object.keys(data[0]);
+    let headRow = "<tr>";
+    headers.forEach(h => headRow += `<th>${h}</th>`);
+    headRow += "</tr>";
+    tableHead.innerHTML = headRow;
+
+    data.forEach(row=>{
+        let tr = "<tr>";
+        headers.forEach(h => tr += `<td>${row[h]||""}</td>`);
+        tr += "</tr>";
+        tableBody.innerHTML += tr;
+    });
+}
+</script>
+
+</body>
+</html>
